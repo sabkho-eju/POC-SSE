@@ -1,0 +1,6 @@
+@PocSSE.Backend.WebApi_HostAddress = http://localhost:5236
+
+GET {{PocSSE.Backend.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
