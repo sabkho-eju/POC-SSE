@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { jobApi } from '../services/api';
+import { useSseConnection } from '../composables/useSseConnection';
 
 const emit = defineEmits<{
   jobStarted: [jobId: string]
@@ -12,6 +13,9 @@ const successMessage = ref<string>('');
 const lastJobId = ref<string>('');
 const isJobActive = ref(false); // Track si un job est en cours
 const durationInput = ref<string>('5'); // Valeur par défaut: 5 secondes
+
+// Connexion SSE pour recevoir les notifications
+const { isConnected, notifications, connectionError, clearNotifications } = useSseConnection();
 
 /**
  * Parse la durée avec gestion d'erreur
@@ -157,6 +161,51 @@ const handleCancelJob = async () => {
     <!-- Message de succès -->
     <div v-if="successMessage && !errorMessage" class="success-message">
       ✅ {{ successMessage }}
+    </div>
+
+    <!-- Section SSE Notifications -->
+    <div class="sse-section">
+      <div class="sse-header">
+        <h3>
+          Notifications SSE
+          <span v-if="isConnected" class="status-badge connected">🟢 Connecté</span>
+          <span v-else class="status-badge disconnected">🔴 Déconnecté</span>
+        </h3>
+        <button 
+          v-if="notifications.length > 0"
+          @click="clearNotifications" 
+          class="btn-clear"
+        >
+          Effacer
+        </button>
+      </div>
+
+      <!-- Erreur de connexion SSE -->
+      <div v-if="connectionError" class="sse-error">
+        ⚠️ {{ connectionError }}
+      </div>
+
+      <!-- Liste des notifications -->
+      <div class="notifications-list">
+        <div 
+          v-if="notifications.length === 0" 
+          class="notification-empty"
+        >
+          Aucune notification reçue
+        </div>
+        
+        <div 
+          v-for="notif in notifications" 
+          :key="notif.id"
+          :class="['notification-item', `notif-${notif.type}`]"
+        >
+          <div class="notif-header">
+            <span class="notif-type">{{ notif.type }}</span>
+            <span class="notif-time">{{ notif.timestamp.toLocaleTimeString() }}</span>
+          </div>
+          <div class="notif-message">{{ notif.message }}</div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -309,5 +358,146 @@ h2 {
   color: #dc2626;
   border-radius: 4px;
   border-left: 4px solid #dc2626;
+}
+
+/* Section SSE */
+.sse-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+}
+
+.sse-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sse-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-badge {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.status-badge.connected {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.disconnected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.btn-clear {
+  padding: 0.5rem 1rem;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.btn-clear:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.sse-error {
+  padding: 0.75rem;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.notifications-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.notification-empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 2rem;
+  font-style: italic;
+}
+
+.notification-item {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border-left: 4px solid #d1d5db;
+  background: #f9fafb;
+  transition: all 0.2s;
+}
+
+.notification-item:hover {
+  background: #f3f4f6;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.notif-connected {
+  border-left-color: #10b981;
+  background: #ecfdf5;
+}
+
+.notif-disconnected {
+  border-left-color: #ef4444;
+  background: #fef2f2;
+}
+
+.notif-message {
+  border-left-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.notif-error {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.notif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.notif-type {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #374151;
+}
+
+.notif-time {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.notif-message {
+  color: #1f2937;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  word-break: break-word;
 }
 </style>
