@@ -19,6 +19,8 @@ export interface User {
 const API_BASE_URL = '/api'; // Proxy Vite
 
 // Clés de stockage
+// Utilisation de sessionStorage pour isoler l'authentification par onglet
+// (permet plusieurs utilisateurs simultanés dans différents onglets)
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
@@ -77,28 +79,28 @@ export const authService = {
    * Stocker le token
    */
   setToken(token: string): void {
-    localStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem(TOKEN_KEY, token);
   },
 
   /**
    * Récupérer le token
    */
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY);
   },
 
   /**
    * Stocker l'utilisateur
    */
   setUser(user: User): void {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
   },
 
   /**
    * Récupérer l'utilisateur
    */
   getUser(): User | null {
-    const userJson = localStorage.getItem(USER_KEY);
+    const userJson = sessionStorage.getItem(USER_KEY);
     return userJson ? JSON.parse(userJson) : null;
   },
 
@@ -118,7 +120,7 @@ export const authService = {
    * Nettoyer les données d'authentification
    */
   clearAuth(): void {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
   },
 };
