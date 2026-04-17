@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using PocSSE.Backend.WebApi.Infra;
 using PocSSE.Backend.WebApi.Services;
+using System.Text;
+using Microsoft.IdentityModel.Protocols.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +17,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     {
         var jwtSettings = builder.Configuration.GetSection("JwtSettings");
         var secretKey = jwtSettings["SecretKey"];
+
+        if(string.IsNullOrEmpty(secretKey)) throw new InvalidConfigurationException("JWT SecretKey not configured");
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -50,6 +54,8 @@ builder.Services.AddAuthorization();
 // Enregistrer le service d'authentification
 builder.Services.AddSingleton<AuthenticationService>();
 
+builder.Services.AddSingleton<BackgroundJobQueue>();
+builder.Services.AddHostedService<JobProcessorWorker>();
 
 var app = builder.Build();
 

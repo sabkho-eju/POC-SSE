@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PocSSE.Backend.WebApi.Models;
+using PocSSE.Backend.WebApi.Models.API.Requests;
+using PocSSE.Backend.WebApi.Models.API.Responses;
 using PocSSE.Backend.WebApi.Services;
 
 namespace PocSSE.Backend.WebApi.Controllers

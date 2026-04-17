@@ -1,11 +1,18 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PocSSE.Backend.WebApi.Infra;
+using PocSSE.Backend.WebApi.Models.API.Requests;
+using System.Security.Claims;
+using PocSSE.Backend.WebApi.Models.API.Responses;
+using PocSSE.Backend.WebApi.Models.Entities;
 
 namespace PocSSE.Backend.WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class JobProcessingController(ILogger<JobProcessingController> logger) : ControllerBase
+public class JobProcessingController(
+    BackgroundJobQueue backgroundJobQueue,
+    ILogger<JobProcessingController> logger) : ControllerBase
 {
     [HttpGet("test")]
     [Authorize]
@@ -18,23 +25,42 @@ public class JobProcessingController(ILogger<JobProcessingController> logger) : 
     [Authorize]
     public async Task<IActionResult> ProcessJob([FromBody] JobRequest request)
     {
-        logger.LogInformation("Processing job: {JobId}", request.JobId);
-        
-        await Task.Delay(100); // Simulation
+        var username = GetAuthenticatedUsername();
+
+        logger.LogInformation("Processing job: {JobId} for user: {Username}", request.JobId, username);
+
+        await backgroundJobQueue.QueueAsync(new QueuedJob(
+            JobId: request.JobId,
+            ClientId: username,
+            Description: request.JobData,
+            DurationSeconds: request.DurationSeconds));
 
         return Ok(new JobResponse
         {
             JobId = request.JobId,
-            Status = "Completed",
+            Status = "Queued",
             ProcessedAt = DateTime.UtcNow
         });
     }
+
+    [HttpPost("cancel")]
+    [Authorize]
+    public IActionResult Cancel(string jobId)
+    {
+        var username = GetAuthenticatedUsername();
+        logger.LogInformation("Cancelling job: {JobId} for user: {Username}", jobId, username);
+
+        //ToDo : implement action
+
+        return Ok($"Cancelled {jobId}");
+    }
+
+    private string GetAuthenticatedUsername()
+    {
+        return User.Identity?.Name
+               ?? User.FindFirstValue(ClaimTypes.Name)
+               ?? throw new UnauthorizedAccessException("User identity not found");
+    }
+
 }
 
-public record JobRequest(string JobId, string JobData);
-public record JobResponse
-{
-    public required string JobId { get; init; }
-    public required string Status { get; init; }
-    public DateTime ProcessedAt { get; init; }
-}
