@@ -55,7 +55,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton<AuthenticationService>();
 
 builder.Services.AddSingleton<BackgroundJobQueue>();
+builder.Services.AddSingleton<JobNotificationService>();
 builder.Services.AddHostedService<JobProcessorWorker>();
+
 
 var app = builder.Build();
 
@@ -65,7 +67,30 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// EventSource ne supporte pas les headers personnalisés, donc le token JWT est passé en query string
+// le backend doit accepter le token de 2 manières :
+// Header Authorization : Authorization: Bearer (endpoint classic)
+// Query string (endpoint SSE)
+app.Use(async (context, next) =>
+{
+    // Si le token n'est pas dans le header, chercher dans query string
+    if (context.Request.Path.StartsWithSegments("/api/serviceeventnotification/ssestream"))
+    {
+        var token = context.Request.Query["access_token"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(token) &&
+            !context.Request.Headers.ContainsKey("Authorization"))
+        {
+            context.Request.Headers.Append("Authorization", $"Bearer {token}");
+        }
+    }
+    await next();
+});
+
+// HTTPS Redirection - Désactivé en développement pour éviter les warnings
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();  
 app.UseAuthorization();
