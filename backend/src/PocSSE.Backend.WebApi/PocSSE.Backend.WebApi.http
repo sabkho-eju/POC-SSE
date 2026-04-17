@@ -1,6 +1,20 @@
 @PocSSE.Backend.WebApi_HostAddress = http://localhost:5236
 
-GET {{PocSSE.Backend.WebApi_HostAddress}}/weatherforecast/
-Accept: application/json
+# Test externe pour vérifier que l'outil HTTP fonctionne
+GET https://jsonplaceholder.typicode.com/todos/1
 
 ###
+
+# Test simple GET
+
+GET {{PocSSE.Backend.WebApi_HostAddress}}/api/jobprocessing/test
+
+###
+
+POST {{PocSSE.Backend.WebApi_HostAddress}}/api/jobprocessing/process
+Content-Type: application/json
+
+{
+  "jobId": "job-123",
+  "jobData": "Sample job data"
+}
