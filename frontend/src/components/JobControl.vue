@@ -1,20 +1,33 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { jobApi } from '../services/api';
 
 const emit = defineEmits<{
-  jobStarted: []
+  jobStarted: [jobId: string]
 }>();
 
 const isProcessing = ref(false);
+const errorMessage = ref<string>('');
+const lastJobId = ref<string>('');
 
-const handleStartJob = () => {
+const handleStartJob = async () => {
   isProcessing.value = true;
-  emit('jobStarted');
+  errorMessage.value = '';
   
-  // Simuler un traitement (sera remplacé par l'appel backend)
-  setTimeout(() => {
+  try {
+    const response = await jobApi.processJob('Sample job data from Vue.js');
+    
+    lastJobId.value = response.jobId;
+    console.log('Job démarré avec succès:', response);
+    
+    emit('jobStarted', response.jobId);
+    
+  } catch (error) {
+    console.error('Erreur:', error);
+    errorMessage.value = 'Erreur lors du démarrage du job. Vérifiez que le backend est lancé.';
+  } finally {
     isProcessing.value = false;
-  }, 2000);
+  }
 };
 </script>
 
@@ -35,6 +48,17 @@ const handleStartJob = () => {
     >
       {{ isProcessing ? 'Traitement en cours...' : 'Start Job' }}
     </button>
+
+    <!-- Message d'erreur -->
+    <div v-if="errorMessage" class="error-message">
+      ⚠️ {{ errorMessage }}
+    </div>
+
+    <!-- Dernier job ID -->
+    <div v-if="lastJobId && !errorMessage" class="success-message">
+      ✅ Job démarré : <strong>{{ lastJobId }}</strong>
+    </div>
+
   </div>
 </template>
 
