@@ -3,15 +3,21 @@ import { authService } from '../services/AuthenticationService';
 
 defineProps<{
   username: string
+  isAuthenticated: boolean
 }>();
 
 const emit = defineEmits<{
   logout: []
+  login: []
 }>();
 
 const handleLogout = async () => {
   await authService.logout();
   emit('logout');
+};
+
+const handleLogin = () => {
+  emit('login');
 };
 </script>
 
@@ -23,10 +29,20 @@ const handleLogout = async () => {
         <p class="subtitle">Démonstration Server-Sent Events</p>
       </div>
       <div class="header-right">
-        <span class="user-info">👤 {{ username }}</span>
-        <button @click="handleLogout" class="btn-logout">
-          Déconnexion
-        </button>
+        <!-- Afficher l'utilisateur et le bouton logout si authentifié -->
+        <template v-if="isAuthenticated">
+          <span class="user-info">👤 {{ username }}</span>
+          <button @click="handleLogout" class="btn-logout">
+            Déconnexion
+          </button>
+        </template>
+        
+        <!-- Afficher le bouton login si non authentifié -->
+        <template v-else>
+          <button @click="handleLogin" class="btn-login">
+            🔐 Connexion
+          </button>
+        </template>
       </div>
     </div>
   </header>
@@ -88,5 +104,23 @@ const handleLogout = async () => {
 .btn-logout:hover {
   background: rgba(255, 255, 255, 0.3);
   border-color: white;
+}
+
+.btn-login {
+  padding: 0.5rem 1.5rem;
+  background: white;
+  color: #667eea;
+  border: 2px solid white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-login:hover {
+  background: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 </style>

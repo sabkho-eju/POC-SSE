@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { authService } from './services/AuthenticationService';
-import LoginForm from './components/LoginForm.vue';
+import LoginModal from './components/LoginModal.vue';
 import AppHeader from './components/AppHeader.vue';
 import JobControl from './components/JobControl.vue';
 
-
 const isAuthenticated = ref(false);
 const username = ref('');
+const showLoginModal = ref(false);
 
 // Vérifier l'authentification au chargement
 onMounted(() => {
@@ -21,11 +21,17 @@ onMounted(() => {
 const handleLoginSuccess = (user: string) => {
   isAuthenticated.value = true;
   username.value = user;
+  showLoginModal.value = false;
 };
 
-const handleLogout = () => {
+const handleLogout = async () => {
+  await authService.logout();
   isAuthenticated.value = false;
   username.value = '';
+};
+
+const handleLoginClick = () => {
+  showLoginModal.value = true;
 };
 
 const handleJobStarted = () => {
@@ -35,19 +41,24 @@ const handleJobStarted = () => {
 </script>
 
 <template>
-  <!-- Afficher le login si non authentifié -->
-  <LoginForm 
-    v-if="!isAuthenticated" 
-    @login-success="handleLoginSuccess" 
-  />
-
-  <!-- Afficher l'app si authentifié -->
-  <div v-else class="app">
-    <AppHeader :username="username" @logout="handleLogout" />
+  <div class="app">
+    <AppHeader 
+      :username="username" 
+      :is-authenticated="isAuthenticated"
+      @logout="handleLogout" 
+      @login="handleLoginClick"
+    />
 
     <main class="app-content">
       <JobControl @job-started="handleJobStarted" />
     </main>
+
+    <!-- Modal de login -->
+    <LoginModal 
+      :is-open="showLoginModal"
+      @close="showLoginModal = false"
+      @login-success="handleLoginSuccess"
+    />
   </div>
 </template>
 
