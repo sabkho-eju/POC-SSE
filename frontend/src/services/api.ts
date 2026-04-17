@@ -1,3 +1,5 @@
+import { authService } from './AuthenticationService';
+
 // Configuration de base
 // En dev, Vite proxifiera /api vers http://localhost:5236
 const API_BASE_URL = ''; // ← Vide pour utiliser le proxy
@@ -14,6 +16,22 @@ export interface JobResponse {
   message?: string;
 }
 
+/**
+ * Ajoute le header Authorization si un token existe
+ */
+const getAuthHeaders = (): HeadersInit => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  const token = authService.getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+};
+
 // Service API
 export const jobApi = {
   /**
@@ -29,14 +47,17 @@ export const jobApi = {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/jobprocessing/process`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: 'POST',    
+        headers: getAuthHeaders(),             
         body: JSON.stringify(body),
       });
 
       if (!response.ok) {
+        // Gestion erreur 401 Unauthorized
+        if (response.status === 401) {
+          authService.clearAuth();
+          window.location.href = '/login';
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 

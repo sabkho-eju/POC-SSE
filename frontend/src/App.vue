@@ -1,5 +1,32 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { authService } from './services/AuthenticationService';
+import LoginForm from './components/LoginForm.vue';
+import AppHeader from './components/AppHeader.vue';
 import JobControl from './components/JobControl.vue';
+
+
+const isAuthenticated = ref(false);
+const username = ref('');
+
+// Vérifier l'authentification au chargement
+onMounted(() => {
+  const user = authService.getUser();
+  if (user && authService.isAuthenticated()) {
+    isAuthenticated.value = true;
+    username.value = user.username;
+  }
+});
+
+const handleLoginSuccess = (user: string) => {
+  isAuthenticated.value = true;
+  username.value = user;
+};
+
+const handleLogout = () => {
+  isAuthenticated.value = false;
+  username.value = '';
+};
 
 const handleJobStarted = () => {
   console.log('Job démarré !');
@@ -8,13 +35,17 @@ const handleJobStarted = () => {
 </script>
 
 <template>
-  <div class="app">
-    <header>
-      <h1>POC SSE - Vue.js + ASP.NET</h1>
-      <p class="subtitle">Démonstration Server-Sent Events</p>
-    </header>
+  <!-- Afficher le login si non authentifié -->
+  <LoginForm 
+    v-if="!isAuthenticated" 
+    @login-success="handleLoginSuccess" 
+  />
 
-    <main>
+  <!-- Afficher l'app si authentifié -->
+  <div v-else class="app">
+    <AppHeader :username="username" @logout="handleLogout" />
+
+    <main class="app-content">
       <JobControl @job-started="handleJobStarted" />
     </main>
   </div>
@@ -27,6 +58,15 @@ const handleJobStarted = () => {
   margin: 0 auto;
   padding: 2rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+.app-content {
+  flex: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 header {
