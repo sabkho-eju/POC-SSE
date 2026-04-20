@@ -94,3 +94,52 @@ export const jobApi = {
     }
   },
 };
+
+// Service API pour les notifications
+export const notificationApi = {
+  /**
+   * Envoie un message à un utilisateur spécifique
+   */
+  async sendToUser(recipientClientId: string, message: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/servicenotification/send-message-to-a-user?recipientClientId=${encodeURIComponent(recipientClientId)}&message=${encodeURIComponent(message)}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          authService.clearAuth();
+          throw new Error('Non authentifié. Veuillez vous connecter.');
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi du message:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Diffuse un message à tous les utilisateurs connectés
+   */
+  async broadcastToAll(message: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/servicenotification/broadcast-to-all-users?message=${encodeURIComponent(message)}`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          authService.clearAuth();
+          throw new Error('Non authentifié. Veuillez vous connecter.');
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Erreur lors du broadcast du message:', error);
+      throw error;
+    }
+  },
+};

@@ -10,24 +10,18 @@ const isProcessing = ref(false);
 const errorMessage = ref<string>('');
 const successMessage = ref<string>('');
 const lastJobId = ref<string>('');
-const isJobActive = ref(false); // Track si un job est en cours
-const durationInput = ref<string>('5'); // Valeur par défaut: 5 secondes
+const isJobActive = ref(false);
+const durationInput = ref<string>('5');
 
-/**
- * Parse la durée avec gestion d'erreur
- * Retourne la durée validée ou la valeur par défaut (5)
- */
 const parseDuration = (): number => {
   const parsed = parseInt(durationInput.value, 10);
   
-  // Vérifier si c'est un nombre valide
   if (isNaN(parsed)) {
     console.warn('Durée invalide, utilisation de la valeur par défaut (5s)');
-    durationInput.value = '5'; // Réinitialiser à la valeur par défaut
+    durationInput.value = '5';
     return 5;
   }
   
-  // Vérifier les limites (min: 1, max: 300 = 5 minutes)
   if (parsed < 1) {
     console.warn('Durée trop courte, minimum 1 seconde');
     durationInput.value = '1';
@@ -48,14 +42,13 @@ const handleStartJob = async () => {
   errorMessage.value = '';
   successMessage.value = '';
   
-  // Parser et valider la durée
   const duration = parseDuration();
   
   try {
     const response = await jobApi.processJob('Sample job data from Vue.js', duration);
     
     lastJobId.value = response.jobId;
-    isJobActive.value = true; // Job est maintenant actif
+    isJobActive.value = true;
     
     const processedTime = new Date(response.processedAt).toLocaleTimeString();
     successMessage.value = `Job démarré : ${response.jobId} (statut: ${response.status}, durée: ${duration}s, à ${processedTime})`;
@@ -66,7 +59,6 @@ const handleStartJob = async () => {
   } catch (error) {
     console.error('Erreur:', error);
     isJobActive.value = false;
-    // Utiliser le message d'erreur spécifique si disponible
     if (error instanceof Error) {
       errorMessage.value = error.message;
     } else {
@@ -87,7 +79,7 @@ const handleCancelJob = async () => {
   try {
     await jobApi.cancelJob(lastJobId.value);
     
-    isJobActive.value = false; // Job n'est plus actif
+    isJobActive.value = false;
     successMessage.value = `Job ${lastJobId.value} annulé avec succès`;
     console.log('Job annulé avec succès');
     
@@ -105,16 +97,14 @@ const handleCancelJob = async () => {
 </script>
 
 <template>
-  <div class="job-control">
-    <div class="info-section">
-      <h2>Lancer un traitement</h2>
+  <div class="job-control-panel">
+    <div class="panel-header">
+      <h2>Contrôle des Jobs</h2>
       <p class="description">
-        Cliquez sur le bouton ci-dessous pour démarrer un traitement asynchrone.
-        Le serveur vous notifiera via SSE lorsque le job sera terminé.
+        Démarrez un traitement asynchrone. Le serveur vous notifiera via SSE lorsque le job sera terminé.
       </p>
     </div>
 
-    <!-- Champ de durée -->
     <div class="form-group">
       <label for="duration">Durée du traitement (secondes) :</label>
       <input 
@@ -149,34 +139,31 @@ const handleCancelJob = async () => {
       </button>
     </div>
 
-    <!-- Message d'erreur -->
     <div v-if="errorMessage" class="error-message">
       ⚠️ {{ errorMessage }}
     </div>
 
-    <!-- Message de succès -->
     <div v-if="successMessage && !errorMessage" class="success-message">
       ✅ {{ successMessage }}
     </div>
-
   </div>
 </template>
 
 <style scoped>
-.job-control {
+.job-control-panel {
   background: #f8f9fa;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.info-section {
+.panel-header {
   margin-bottom: 1.5rem;
 }
 
 h2 {
   color: #2c3e50;
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.5rem 0;
   font-size: 1.5rem;
 }
 
@@ -184,6 +171,7 @@ h2 {
   color: #666;
   line-height: 1.6;
   margin: 0;
+  font-size: 0.95rem;
 }
 
 .form-group {
@@ -195,7 +183,7 @@ h2 {
   margin-bottom: 0.5rem;
   font-weight: 500;
   color: #374151;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .input-duration {
@@ -229,16 +217,26 @@ h2 {
   font-style: italic;
 }
 
-.btn-start-job {
-  background-color: #42b983;
-  color: white;
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.btn-start-job,
+.btn-cancel-job {
+  padding: 0.875rem 1.75rem;
   border: none;
-  padding: 14px 28px;
-  font-size: 16px;
-  font-weight: 600;
   border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  color: white;
+}
+
+.btn-start-job {
+  background-color: #42b983;
   box-shadow: 0 2px 4px rgba(66, 185, 131, 0.3);
 }
 
@@ -248,32 +246,8 @@ h2 {
   box-shadow: 0 4px 8px rgba(66, 185, 131, 0.4);
 }
 
-.btn-start-job:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.btn-start-job:disabled {
-  background-color: #95c9b4;
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.button-group {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
 .btn-cancel-job {
   background-color: #dc3545;
-  color: white;
-  border: none;
-  padding: 14px 28px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
   box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
 }
 
@@ -283,14 +257,16 @@ h2 {
   box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
 }
 
+.btn-start-job:active:not(:disabled),
 .btn-cancel-job:active:not(:disabled) {
   transform: translateY(0);
 }
 
+.btn-start-job:disabled,
 .btn-cancel-job:disabled {
-  background-color: #f8a5ad;
-  cursor: not-allowed;
   opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .success-message {
