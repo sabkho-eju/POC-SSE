@@ -8,19 +8,12 @@ namespace PocSSE.Backend.WebApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AuthenticationController : ControllerBase
+    public class AuthenticationController(AuthenticationService authService) : ControllerBase
     {
-        private readonly AuthenticationService _authService;
-
-        public AuthenticationController(AuthenticationService authService)
-        {
-            _authService = authService;
-        }
-
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest request)
         {
-            var (success, token) = _authService.ValidateAndGenerateToken(request.Username, request.Password);
+            var (success, token) = authService.ValidateAndGenerateToken(request.Username, request.Password);
 
             if (!success)
             {
