@@ -102,7 +102,7 @@ export const notificationApi = {
    */
   async sendToUser(recipientClientId: string, message: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/servicenotification/send-message-to-a-user?recipientClientId=${encodeURIComponent(recipientClientId)}&message=${encodeURIComponent(message)}`, {
+      const response = await fetch(`${API_BASE_URL}/messaging/send-message-to-a-user?recipientClientId=${encodeURIComponent(recipientClientId)}&message=${encodeURIComponent(message)}`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -125,7 +125,7 @@ export const notificationApi = {
    */
   async broadcastToAll(message: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/servicenotification/broadcast-to-all-users?message=${encodeURIComponent(message)}`, {
+      const response = await fetch(`${API_BASE_URL}/messaging/broadcast-to-all-users?message=${encodeURIComponent(message)}`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
