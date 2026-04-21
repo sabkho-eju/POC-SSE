@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using PocSSE.Backend.WebApi.Infra;
 using PocSSE.Backend.WebApi.Services;
 using System.Text;
 using Microsoft.IdentityModel.Protocols.Configuration;
+using PocSSE.Backend.WebApi.Infra.Jobs;
+using PocSSE.Backend.WebApi.Infra.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,23 +31,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtSettings["Audience"] ?? "POC-SSE-Frontend",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
         };
-
-        // Pour SSE : accepter le token depuis query string
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["token"];
-                var path = context.HttpContext.Request.Path;
-
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/api/sse"))
-                {
-                    context.Token = accessToken;
-                }
-
-                return Task.CompletedTask;
-            }
-        };
     });
 
 builder.Services.AddAuthorization();
@@ -55,6 +39,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton<AuthenticationService>();
 
 builder.Services.AddSingleton<BackgroundJobQueue>();
+builder.Services.AddSingleton<NotificationQueue>();
 builder.Services.AddHostedService<JobProcessorWorker>();
 
 var app = builder.Build();

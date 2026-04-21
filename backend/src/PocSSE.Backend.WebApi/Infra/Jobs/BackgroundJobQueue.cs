@@ -1,7 +1,7 @@
 ﻿using System.Threading.Channels;
 using PocSSE.Backend.WebApi.Models.Entities;
 
-namespace PocSSE.Backend.WebApi.Infra
+namespace PocSSE.Backend.WebApi.Infra.Jobs
 {
     public sealed class BackgroundJobQueue
     {
