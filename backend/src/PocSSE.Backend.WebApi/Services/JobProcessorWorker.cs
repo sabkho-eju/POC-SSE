@@ -1,5 +1,7 @@
-﻿using PocSSE.Backend.WebApi.Infra.Jobs;
+﻿using System.Text.Json;
+using PocSSE.Backend.WebApi.Infra.Jobs;
 using PocSSE.Backend.WebApi.Infra.Notifications;
+using PocSSE.Backend.WebApi.Models.API.Responses;
 using PocSSE.Backend.WebApi.Models.Entities;
 
 namespace PocSSE.Backend.WebApi.Services
@@ -17,7 +19,8 @@ namespace PocSSE.Backend.WebApi.Services
                 try
                 {
                     job = await queue.DequeueAsync(stoppingToken);
-                    NotificationQueue.PublishToClient(job.ClientId, new QueuedNotification("JobStarted", $"Job {job.JobId} started", null));
+                    var jobStartedData = JsonSerializer.SerializeToElement(new JobResponse(job.JobId, "JobStarted", DateTime.UtcNow));
+                    NotificationQueue.PublishToClient(job.ClientId, new QueuedNotification("JobStarted", jobStartedData));
                 }
                 catch (OperationCanceledException)
                 {
@@ -26,7 +29,11 @@ namespace PocSSE.Backend.WebApi.Services
 
                 logger.LogInformation("Starting job {JobId} for client {ClientId}", job.JobId, job.ClientId);
                 await Task.Delay(TimeSpan.FromSeconds(job.DurationSeconds), stoppingToken);
-                NotificationQueue.PublishToClient(job.ClientId, new QueuedNotification("JobCompleted", $"Job {job.JobId} completed", null));
+
+                // Notification de complétion avec données
+                var jobCompletedData = JsonSerializer.SerializeToElement(new JobResponse(job.JobId, "JobCompleted", DateTime.UtcNow));
+                NotificationQueue.PublishToClient(job.ClientId, new QueuedNotification("JobCompleted", jobCompletedData));
+
                 logger.LogInformation("Completed job {JobId} for client {ClientId}", job.JobId, job.ClientId);
             }
         }
