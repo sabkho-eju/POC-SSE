@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PocSSE.Backend.WebApi.Infra.Notifications;
+using PocSSE.Backend.WebApi.Models.API.Responses;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace PocSSE.Backend.WebApi.Controllers
 {
@@ -17,7 +19,9 @@ namespace PocSSE.Backend.WebApi.Controllers
             var username = GetAuthenticatedUsername();
             logger.LogInformation("Send message: {Message} from user: {Username} to recipient : {RecipientId}", message,
                 username, recipientClientId);
-            if (NotificationQueue.PublishToClient(recipientClientId, new QueuedNotification("SendMessageToUser", message, null)))
+
+            var sendMessageData = JsonSerializer.SerializeToElement(new MessagingNotification(message));
+            if (NotificationQueue.PublishToClient(recipientClientId, new QueuedNotification("SendMessageToUser", sendMessageData)))
             {
                 return Ok();
             }
@@ -32,7 +36,8 @@ namespace PocSSE.Backend.WebApi.Controllers
         {
             var username = GetAuthenticatedUsername();
             logger.LogInformation("Broadcast message: {Message} from user: {Username}", message, username);
-            if (NotificationQueue.PublishToClient(username, new QueuedNotification("BroadcastMessage", message, null)))
+            var broadcastMessageData = JsonSerializer.SerializeToElement(new MessagingNotification(message));
+            if (NotificationQueue.PublishToClient(username, new QueuedNotification("BroadcastMessage", broadcastMessageData)))
             {
                 return Ok();
             }
