@@ -51,6 +51,5 @@ public class JobProcessingController(
                ?? User.FindFirstValue(ClaimTypes.Name)
                ?? throw new UnauthorizedAccessException("User identity not found");
     }
-
 }
 
