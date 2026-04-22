@@ -31,6 +31,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtSettings["Audience"] ?? "POC-SSE-Frontend",
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
         };
+
+        //Pour SSE : accepter le token depuis query string
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                // Vérification exacte du path (case-sensitive)
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    path.Equals("/api/jobprocessing/job-notification-stream", StringComparison.Ordinal))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
