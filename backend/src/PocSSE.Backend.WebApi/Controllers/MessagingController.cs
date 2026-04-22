@@ -4,6 +4,7 @@ using PocSSE.Backend.WebApi.Infra.Notifications;
 using PocSSE.Backend.WebApi.Models.API.Responses;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace PocSSE.Backend.WebApi.Controllers
 {
@@ -44,6 +45,83 @@ namespace PocSSE.Backend.WebApi.Controllers
             logger.LogWarning("Broadcast message: {Message} from user: {Username} failed", message, username);
             return BadRequest("Failed to broadcast message. No users may be connected.");
         }
+
+        [HttpGet("messaging-notification-stream")]
+        [Authorize]
+        public IResult GetNotificationStream(CancellationToken cancellationToken)
+        {
+            var subscriptionId = Guid.Empty;
+            var userName = string.Empty;
+            try
+            {
+                userName = GetAuthenticatedUsername();
+                var (sId, channelReader) = NotificationQueue.Subscribe(userName);
+                subscriptionId = sId;
+
+                logger.LogInformation("Client {Username} connected with subscription {SubscriptionId}", userName, sId);
+
+                var notificationStream = Notifications(userName, channelReader, cancellationToken);
+
+                NotificationQueue.PublishToClient(userName, new QueuedNotification("Connected", null));
+
+                return Results.ServerSentEvents(notificationStream, eventType: "MessagingNotification");
+            }
+            catch (OperationCanceledException operationCanceledException)
+            {
+                logger.LogInformation(operationCanceledException, "Notification stream for user {Username} was cancelled", userName);
+                NotificationQueue.PublishToClient(userName, new QueuedNotification("Disconnected", null));
+                Unsubscribe(subscriptionId, userName);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error in notification stream for user {Username}", userName);
+                NotificationQueue.PublishToClient(userName, new QueuedNotification("Disconnected", null));
+                Unsubscribe(subscriptionId, userName);
+            }
+
+            return Results.NoContent();
+        }
+
+        private void Unsubscribe(Guid subscriptionId, string userName)
+        {
+            if (subscriptionId != Guid.Empty && !string.IsNullOrEmpty(userName))
+            {
+                NotificationQueue.Unsubscribe(userName, subscriptionId);
+                logger.LogInformation("Client {Username} disconnected, unsubscribed {SubscriptionId}", userName, subscriptionId);
+            }
+        }
+
+        private async IAsyncEnumerable<MessagingNotification> Notifications(string userName, ChannelReader<QueuedNotification> channelReader, CancellationToken cancellationToken)
+        {
+            await foreach (var notification in channelReader.ReadAllAsync(cancellationToken))
+            {
+                logger.LogInformation("Sending notification to client {Username}: {Notification}", userName, JsonSerializer.SerializeToElement(notification).ToString());
+                yield return MapToMessagingNotification(notification);
+            }
+        }
+
+        private MessagingNotification MapToMessagingNotification(QueuedNotification queuedNotification)
+        {
+            var message = string.Empty;
+
+            if (queuedNotification.Data.HasValue)
+            {
+                var data = queuedNotification.Data.Value;
+
+                // Extraire message (case-insensitive)
+                if (data.TryGetProperty("message", out var messageElement))
+                {
+                    message = messageElement.GetString() ?? string.Empty;
+                }
+                else if (data.TryGetProperty("Message", out var messageElementCaps))
+                {
+                    message = messageElementCaps.GetString() ?? string.Empty;
+                }
+            }
+
+            return new MessagingNotification(message);
+        }
+
 
         private string GetAuthenticatedUsername()
         {
