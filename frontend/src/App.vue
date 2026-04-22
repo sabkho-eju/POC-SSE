@@ -3,7 +3,9 @@ import { ref, onMounted } from 'vue';
 import { authService } from './services/AuthenticationService';
 import LoginModal from './components/LoginModal.vue';
 import AppHeader from './components/AppHeader.vue';
-import MainDashboard from './components/MainDashboard.vue';
+import JobControlPanel from './components/JobControlPanel.vue';
+import MessagingPanel from './components/MessagingPanel.vue';
+import NotificationsPanel from './components/NotificationsPanel.vue';
 
 const isAuthenticated = ref(false);
 const username = ref('');
@@ -45,7 +47,13 @@ const handleLoginClick = () => {
     />
 
     <main class="app-content">
-      <MainDashboard />
+      <div class="dashboard">
+        <div class="panels-container">
+          <JobControlPanel :is-authenticated="isAuthenticated" />
+          <MessagingPanel :is-authenticated="isAuthenticated" />
+          <NotificationsPanel />
+        </div>
+      </div>
     </main>
 
     <!-- Modal de login -->
@@ -71,5 +79,17 @@ const handleLoginClick = () => {
   padding: 2rem;
   width: 100%;
   box-sizing: border-box;
+}
+
+.dashboard {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.panels-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 </style>

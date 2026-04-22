@@ -18,11 +18,7 @@ export function useServiceNotification() {
   };
 
   const disconnect = () => {
-    /*
-    if (sseService) {
-      sseService.disconnect();
-    }
-      */
+   
   };
 
   const clearNotifications = () => {
