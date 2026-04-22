@@ -115,10 +115,69 @@ export const jobApi = {
   },
 
   connectToStream(handlers: JobNotificationStreamHandlers): () => void {
-    
+    const token = authService.getToken();
+    if (!token) {
+      const error = new Error('Token manquant. Veuillez vous connecter.');
+      handlers.onError?.(error);
+      return () => {};
+    }
+
+    // EventSource ne supporte pas les headers personnalisés, on passe le token dans l'URL
+    const url = `${API_BASE_URL}/jobprocessing/job-notification-stream?access_token=${encodeURIComponent(token)}`;
+    const eventSource = new EventSource(url);
+
+    // Connexion ouverte
+    eventSource.onopen = () => {
+      console.log('SSE Connection opened');
+      handlers.onOpen?.();
+    };
+
+    // Écouter l'événement spécifique 'JobNotification' défini côté backend
+    eventSource.addEventListener('JobNotification', (event) => {
+      try {
+        const notification: JobResponse = JSON.parse(event.data);
+        console.log(`Job Notification ${event.lastEventId}:`, notification);
+        handlers.onMessage(notification);
+      } catch (error) {
+        const parseError = error instanceof Error 
+          ? error 
+          : new Error('Erreur lors du parsing de la notification');
+        handlers.onError?.(parseError);
+      }
+    });
+
+    // Gérer les messages génériques (si le backend n'utilise pas d'événement nommé)
+    eventSource.onmessage = (event) => {
+      try {
+        const notification: JobResponse = JSON.parse(event.data);
+        console.log('Received job notification:', notification);
+        handlers.onMessage(notification);
+      } catch (error) {
+        const parseError = error instanceof Error 
+          ? error 
+          : new Error('Erreur lors du parsing de la notification');
+        handlers.onError?.(parseError);
+      }
+    };
+
+    // Gérer les erreurs et reconnexions
+    eventSource.onerror = () => {
+      if (eventSource.readyState === EventSource.CONNECTING) {
+        console.log('SSE Reconnecting...');
+      } else if (eventSource.readyState === EventSource.CLOSED) {
+        console.log('SSE Connection closed');
+        handlers.onClose?.();
+      } else {
+        const error = new Error('Erreur de connexion SSE');
+        handlers.onError?.(error);
+      }
+    };
+
     // Retourner une fonction de cleanup pour fermer la connexion
     return () => {
-      console.log('Closing connection');            
+      console.log('Closing SSE connection');
+      eventSource.close();
+      handlers.onClose?.();
     };
   },  
 };
