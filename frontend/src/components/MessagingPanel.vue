@@ -1,14 +1,38 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { notificationApi } from '../services/api';
+import { useMessagingNotification } from '../composables/useMessagingNotification';
+const { isConnected, notifications, connectionError, connect, disconnect } = useMessagingNotification();
 
+const props = defineProps<{
+  isAuthenticated: boolean
+}>();
+
+// Déclarer les variables avant le watch
 const isProcessing = ref(false);
 const errorMessage = ref<string>('');
 const successMessage = ref<string>('');
-
 const recipientClientId = ref<string>('');
 const userMessage = ref<string>('');
 const broadcastMessage = ref<string>('');
+
+// Surveiller l'état d'authentification pour se connecter/déconnecter
+watch(() => props.isAuthenticated, (authenticated) => {
+  if (authenticated) {
+    console.log('Utilisateur connecté - Connexion au stream SSE de messaging');
+    connect();
+  } else {
+    console.log('Utilisateur déconnecté - Déconnexion du stream SSE de messaging');
+    disconnect();
+    // Réinitialiser l'état
+    errorMessage.value = '';
+    successMessage.value = '';
+    recipientClientId.value = '';
+    userMessage.value = '';
+    broadcastMessage.value = '';
+    notifications.value = []; // Vider les notifications
+  }
+}, { immediate: true });
 
 /**
  * Envoie un message à un utilisateur spécifique
@@ -137,6 +161,19 @@ const handleBroadcast = async () => {
         </button>
       </div>
     </div>
+
+    <div class="button-group">
+      <h2>        
+        <label style="font-size: 1rem; margin: 0 0.5rem 0 0;">Notifications Service</label>
+        <span v-if="isConnected" class="status-badge connected">🟢 Connecté</span>
+        <span v-else class="status-badge disconnected">🔴 Déconnecté</span>
+      </h2>
+    </div>
+
+    <div v-if="connectionError" class="connection-error-message">
+      ⚠️ {{ connectionError }}
+    </div>
+
 
     <div v-if="errorMessage" class="error-message">
       ⚠️ {{ errorMessage }}
@@ -281,5 +318,32 @@ h2 {
   color: #dc2626;
   border-radius: 4px;
   border-left: 4px solid #dc2626;
+}
+
+.connection-error-message {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 4px;
+  border-left: 4px solid #f59e0b;
+  font-size: 0.9rem;
+}
+
+.status-badge {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.status-badge.connected {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.disconnected {
+  background: #fee2e2;
+  color: #991b1b;
 }
 </style>

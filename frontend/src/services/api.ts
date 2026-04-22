@@ -14,7 +14,27 @@ export interface JobRequest {
 export interface JobResponse {
   jobId: string;
   status: string;
-  processedAt: string; // DateTime sérialisé en ISO string
+  timestamp: string; // DateTime sérialisé en ISO string
+}
+
+export interface ServiceMessagingNotification {
+  message: string;
+}
+
+export interface JobNotificationStreamHandlers {
+  onOpen?: () => void;
+  onMessage: (notification: JobResponse) => void;
+  onError?: (error: Error) => void;
+  onUnauthorized?: () => void;
+  onClose?: () => void;
+}
+
+export interface MessagingNotificationStreamHandlers {
+  onOpen?: () => void;
+  onMessage: (notification: ServiceMessagingNotification) => void; 
+  onError?: (error: Error) => void;
+  onUnauthorized?: () => void;
+  onClose?: () => void;
 }
 
 /**
@@ -93,6 +113,14 @@ export const jobApi = {
       throw error;
     }
   },
+
+  connectToStream(handlers: JobNotificationStreamHandlers): () => void {
+    
+    // Retourner une fonction de cleanup pour fermer la connexion
+    return () => {
+      console.log('Closing connection');            
+    };
+  },  
 };
 
 // Service API pour les notifications
@@ -142,4 +170,13 @@ export const notificationApi = {
       throw error;
     }
   },
+
+  connectToStream(handlers: MessagingNotificationStreamHandlers): () => void {
+    
+    // Retourner une fonction de cleanup pour fermer la connexion
+    return () => {
+      console.log('Closing connection');            
+    };
+  },  
 };
+
