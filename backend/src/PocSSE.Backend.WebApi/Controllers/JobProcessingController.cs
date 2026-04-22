@@ -41,7 +41,7 @@ public class JobProcessingController(
         {
             JobId = request.JobId,
             Status = "Queued",
-            ProcessedAt = DateTime.UtcNow
+            Timestamp = DateTime.UtcNow
         });
     }
 
