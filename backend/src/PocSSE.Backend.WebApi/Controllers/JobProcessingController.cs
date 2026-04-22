@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using PocSSE.Backend.WebApi.Models.API.Requests;
-using System.Security.Claims;
-using PocSSE.Backend.WebApi.Models.API.Responses;
-using PocSSE.Backend.WebApi.Models.Entities;
 using PocSSE.Backend.WebApi.Infra.Jobs;
 using PocSSE.Backend.WebApi.Infra.Notifications;
+using PocSSE.Backend.WebApi.Models.API.Requests;
+using PocSSE.Backend.WebApi.Models.API.Responses;
+using PocSSE.Backend.WebApi.Models.Entities;
+using System.Security.Claims;
 
 namespace PocSSE.Backend.WebApi.Controllers;
 
@@ -16,13 +16,6 @@ public class JobProcessingController(
     NotificationQueue NotificationQueue,
     ILogger<JobProcessingController> logger) : ControllerBase
 {
-    [HttpGet("test")]
-    [Authorize]
-    public IActionResult Test()
-    {
-        return Ok("Controller is working!");
-    }
-
     [HttpPost("process")]
     [Authorize]
     public async Task<IActionResult> ProcessJob([FromBody] JobRequest request)
@@ -37,12 +30,7 @@ public class JobProcessingController(
             Description: request.JobData,
             DurationSeconds: request.DurationSeconds));
 
-        return Ok(new JobResponse
-        {
-            JobId = request.JobId,
-            Status = "Queued",
-            Timestamp = DateTime.UtcNow
-        });
+        return Ok(new JobResponse(request.JobId, "JobQueued", DateTime.UtcNow));
     }
 
     [HttpPost("cancel")]
