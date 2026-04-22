@@ -17,7 +17,7 @@ namespace PocSSE.Backend.WebApi.Controllers
             var username = GetAuthenticatedUsername();
             logger.LogInformation("Send message: {Message} from user: {Username} to recipient : {RecipientId}", message,
                 username, recipientClientId);
-            if (NotificationQueue.PublishToClient(username, new QueuedNotification("SendMessageToUser", message, null)))
+            if (NotificationQueue.PublishToClient(recipientClientId, new QueuedNotification("SendMessageToUser", message, null)))
             {
                 return Ok();
             }
