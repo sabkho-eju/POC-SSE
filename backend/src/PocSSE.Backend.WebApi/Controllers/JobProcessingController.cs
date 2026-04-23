@@ -96,7 +96,7 @@ public class JobProcessingController(
     {
         await foreach (var notification in channelReader.ReadAllAsync(cancellationToken))
         {
-            logger.LogInformation("Sending notification to client {Username}: {Notification}", userName, JsonSerializer.SerializeToElement(notification).ToString());
+            logger.LogInformation("Sending job notification to client {Username}: {Notification}", userName, JsonSerializer.SerializeToElement(notification).ToString());
             yield return MapToJobResponse(notification);
         }
     }

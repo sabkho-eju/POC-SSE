@@ -95,7 +95,7 @@ namespace PocSSE.Backend.WebApi.Controllers
         {
             await foreach (var notification in channelReader.ReadAllAsync(cancellationToken))
             {
-                logger.LogInformation("Sending notification to client {Username}: {Notification}", userName, JsonSerializer.SerializeToElement(notification).ToString());
+                logger.LogInformation("Sending messaging notification to client {Username}: {Notification}", userName, JsonSerializer.SerializeToElement(notification).ToString());
                 yield return MapToMessagingNotification(notification);
             }
         }

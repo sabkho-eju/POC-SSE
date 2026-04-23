@@ -42,7 +42,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
                 // Vérification exacte du path (case-sensitive)
                 if (!string.IsNullOrEmpty(accessToken) &&
-                    path.Equals("/api/jobprocessing/job-notification-stream", StringComparison.Ordinal))
+                    (path.Equals("/api/jobprocessing/job-notification-stream", StringComparison.Ordinal) || 
+                     path.Equals("/api/messaging/messaging-notification-stream", StringComparison.Ordinal)))
                 {
                     context.Token = accessToken;
                 }
