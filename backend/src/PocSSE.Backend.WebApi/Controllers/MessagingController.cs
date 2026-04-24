@@ -9,7 +9,7 @@ namespace PocSSE.Backend.WebApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class MessagingController(NotificationQueue NotificationQueue,
+    public class MessagingController(NotificationQueue notificationQueue,
         ILogger<MessagingController> logger) : ControllerBase
     {
         [HttpPost("send-message-to-a-user")]
@@ -20,14 +20,16 @@ namespace PocSSE.Backend.WebApi.Controllers
             logger.LogInformation("Send message: {Message} from user: {Username} to recipient : {RecipientId}", message,
                 username, recipientClientId);
 
-            var sendMessageData = JsonSerializer.SerializeToElement(new MessagingNotification(message));
-            if (NotificationQueue.PublishToClient(recipientClientId, new QueuedNotification("SendMessageToUser", sendMessageData)))
+            var sendMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("SendMessageToUser", message));
+            var count = notificationQueue.Publish(recipientClientId, new QueuedNotification("MessagingNotification", sendMessageData));
+
+            if (count > 0)
             {
                 return Ok();
             }
             logger.LogWarning("Send message: {Message} from user: {Username} to recipient : {RecipientId} failed", message,
                 username, recipientClientId);
-            return BadRequest("Failed to send message. Recipient may not be connected.");
+            return BadRequest("Failed to send message. No subscribers may be listening.");
         }
 
         [HttpPost("broadcast-to-all-users")]
@@ -36,13 +38,15 @@ namespace PocSSE.Backend.WebApi.Controllers
         {
             var username = GetAuthenticatedUsername();
             logger.LogInformation("Broadcast message: {Message} from user: {Username}", message, username);
-            var broadcastMessageData = JsonSerializer.SerializeToElement(new MessagingNotification(message));
-            if (NotificationQueue.PublishToClient(username, new QueuedNotification("BroadcastMessage", broadcastMessageData)))
+            var broadcastMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("BroadcastMessage", message));
+            var count = notificationQueue.Publish(null, new QueuedNotification("MessagingNotification", broadcastMessageData));
+
+            if (count > 0)
             {
                 return Ok();
             }
             logger.LogWarning("Broadcast message: {Message} from user: {Username} failed", message, username);
-            return BadRequest("Failed to broadcast message. No users may be connected.");
+            return BadRequest("Failed to broadcast message. No users may be listening.");
         }
 
         private string GetAuthenticatedUsername()

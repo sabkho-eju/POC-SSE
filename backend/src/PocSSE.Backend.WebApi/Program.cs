@@ -3,7 +3,6 @@ using Microsoft.IdentityModel.Tokens;
 using PocSSE.Backend.WebApi.Services;
 using System.Text;
 using Microsoft.IdentityModel.Protocols.Configuration;
-using PocSSE.Backend.WebApi.Infra.Jobs;
 using PocSSE.Backend.WebApi.Infra.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,7 +37,6 @@ builder.Services.AddAuthorization();
 // Enregistrer le service d'authentification
 builder.Services.AddSingleton<AuthenticationService>();
 
-builder.Services.AddSingleton<BackgroundJobQueue>();
 builder.Services.AddSingleton<NotificationQueue>();
 builder.Services.AddHostedService<JobProcessorWorker>();
 
