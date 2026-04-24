@@ -14,3 +14,4 @@ namespace PocSSE.Backend.WebApi.Infra.Jobs
             => _queue.Reader.ReadAsync(cancellationToken);
     }
 }
+

@@ -18,6 +18,7 @@ export interface JobResponse {
 }
 
 export interface ServiceMessagingNotification {
+  messageType: string;
   message: string;
 }
 
