@@ -59,27 +59,30 @@ namespace PocSSE.Backend.WebApi.Controllers
             try
             {
                 userName = GetAuthenticatedUsername();
-                var (sId, channelReader) = NotificationQueue.Subscribe(userName);
+                var (sId, channelReader) = NotificationQueue.Subscribe("MessagingNotification", userName);
                 subscriptionId = sId;
 
                 logger.LogInformation("Client {Username} connected with subscription {SubscriptionId}", userName, sId);
 
                 var notificationStream = Notifications(userName, channelReader, cancellationToken);
 
-                NotificationQueue.PublishToClient(userName, new QueuedNotification("Connected", null));
+                var connectionMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("Connected", string.Empty));
+                NotificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
 
                 return Results.ServerSentEvents(notificationStream, eventType: "MessagingNotification");
             }
             catch (OperationCanceledException operationCanceledException)
             {
                 logger.LogInformation(operationCanceledException, "Notification stream for user {Username} was cancelled", userName);
-                NotificationQueue.PublishToClient(userName, new QueuedNotification("Disconnected", null));
+                var connectionMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("Disconnected", string.Empty));
+                NotificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
                 Unsubscribe(subscriptionId, userName);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error in notification stream for user {Username}", userName);
-                NotificationQueue.PublishToClient(userName, new QueuedNotification("Disconnected", null));
+                var connectionMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("Disconnected", string.Empty));
+                NotificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
                 Unsubscribe(subscriptionId, userName);
             }
 
@@ -90,7 +93,7 @@ namespace PocSSE.Backend.WebApi.Controllers
         {
             if (subscriptionId != Guid.Empty && !string.IsNullOrEmpty(userName))
             {
-                NotificationQueue.Unsubscribe(userName, subscriptionId);
+                NotificationQueue.Unsubscribe(subscriptionId);
                 logger.LogInformation("Client {Username} disconnected, unsubscribed {SubscriptionId}", userName, subscriptionId);
             }
         }
@@ -106,6 +109,7 @@ namespace PocSSE.Backend.WebApi.Controllers
 
         private MessagingNotification MapToMessagingNotification(QueuedNotification queuedNotification)
         {
+            var messageType = string.Empty;
             var message = string.Empty;
 
             if (queuedNotification.Data.HasValue)
@@ -113,6 +117,15 @@ namespace PocSSE.Backend.WebApi.Controllers
                 var data = queuedNotification.Data.Value;
 
                 // Extraire message (case-insensitive)
+                if (data.TryGetProperty("messageType", out var messageTypeElement))
+                {
+                    messageType = messageTypeElement.GetString() ?? string.Empty;
+                }
+                else if (data.TryGetProperty("MessageType", out var messageTypeElementCaps))
+                {
+                    messageType = messageTypeElementCaps.GetString() ?? string.Empty;
+                }
+
                 if (data.TryGetProperty("message", out var messageElement))
                 {
                     message = messageElement.GetString() ?? string.Empty;
@@ -123,7 +136,7 @@ namespace PocSSE.Backend.WebApi.Controllers
                 }
             }
 
-            return new MessagingNotification(message);
+            return new MessagingNotification(messageType, message);
         }
 
 

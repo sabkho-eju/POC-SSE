@@ -7,6 +7,7 @@ using PocSSE.Backend.WebApi.Models.Entities;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Channels;
+using PocSSE.Backend.WebApi.Infra.Notifications;
 
 namespace PocSSE.Backend.WebApi.Controllers;
 
@@ -14,6 +15,7 @@ namespace PocSSE.Backend.WebApi.Controllers;
 [Route("api/[controller]")]
 public class JobProcessingController(
     BackgroundJobQueue backgroundJobQueue,
+    NotificationQueue NotificationQueue,
     ILogger<JobProcessingController> logger) : ControllerBase
 {
     [HttpPost("process")]
@@ -54,27 +56,30 @@ public class JobProcessingController(
         try
         {
             userName = GetAuthenticatedUsername();
-            var (sId, channelReader) = NotificationQueue.Subscribe(userName);
+            var (sId, channelReader) = NotificationQueue.Subscribe("JobNotification", userName);
             subscriptionId = sId;
 
             logger.LogInformation("Client {Username} connected with subscription {SubscriptionId}", userName, sId);
 
             var notificationStream = Notifications(userName, channelReader, cancellationToken);
 
-            NotificationQueue.PublishToClient(userName, new QueuedNotification("Connected", null));
+            var connectionMessageData = JsonSerializer.SerializeToElement(new JobResponse(string.Empty, "Connected", DateTime.UtcNow));
+            NotificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
 
             return Results.ServerSentEvents(notificationStream, eventType: "JobNotification");
         }
         catch (OperationCanceledException operationCanceledException)
         {
             logger.LogInformation(operationCanceledException, "Notification stream for user {Username} was cancelled", userName);
-            NotificationQueue.PublishToClient(userName, new QueuedNotification("Disconnected", null));
+            var connectionMessageData = JsonSerializer.SerializeToElement(new JobResponse(string.Empty, "Disconnected", DateTime.UtcNow));
+            NotificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
             Unsubscribe(subscriptionId, userName);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error in notification stream for user {Username}", userName);
-            NotificationQueue.PublishToClient(userName, new QueuedNotification("Disconnected", null));
+            var connectionMessageData = JsonSerializer.SerializeToElement(new JobResponse(string.Empty, "Disconnected", DateTime.UtcNow));
+            NotificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
             Unsubscribe(subscriptionId, userName);
         }
 
@@ -85,7 +90,7 @@ public class JobProcessingController(
     {
         if (subscriptionId != Guid.Empty && !string.IsNullOrEmpty(userName))
         {
-            NotificationQueue.Unsubscribe(userName, subscriptionId);
+            NotificationQueue.Unsubscribe(subscriptionId);
             logger.LogInformation("Client {Username} disconnected, unsubscribed {SubscriptionId}", userName, subscriptionId);
         }
     }
@@ -102,6 +107,7 @@ public class JobProcessingController(
     private JobResponse MapToJobResponse(QueuedNotification queuedNotification)
     {
         var jobId = "unknown";
+        var status = "unknown";
         var timestamp = DateTime.UtcNow;
 
         if (queuedNotification.Data.HasValue)
@@ -118,19 +124,36 @@ public class JobProcessingController(
                 jobId = jobIdElementCaps.GetString() ?? "unknown";
             }
 
+            if (data.TryGetProperty("status", out var statusElement))
+            {
+                status = statusElement.GetString() ?? "unknown";
+            }
+            else if (data.TryGetProperty("Status", out var statusElementCaps))
+            {
+                status = statusElementCaps.GetString() ?? "unknown";
+            }
+
             // Optionnel : extraire le timestamp des données si disponible
-            if (data.TryGetProperty("completedAt", out var completedAtElement))
+            if (data.TryGetProperty("timestamp", out var completedAtElement))
             {
                 if (DateTime.TryParse(completedAtElement.GetString(), out var parsedTimestamp))
                 {
                     timestamp = parsedTimestamp;
                 }
             }
+            else if (data.TryGetProperty("Timestamp", out var completedAtElementCaps))
+            {
+                if (DateTime.TryParse(completedAtElementCaps.GetString(), out var parsedTimestamp))
+                {
+                    timestamp = parsedTimestamp;
+                }
+            }
+
         }
 
         return new JobResponse(
             JobId: jobId,
-            Status: queuedNotification.EventName,
+            Status: status,
             Timestamp: timestamp
         );
     }
