@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PocSSE.Backend.WebApi.Infra.Notifications;
 using PocSSE.Backend.WebApi.Models.API.Requests;
@@ -7,15 +8,12 @@ using PocSSE.Backend.WebApi.Models.Entities;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Channels;
-using PocSSE.Backend.WebApi.Infra.Notifications;
 
 namespace PocSSE.Backend.WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class JobProcessingController(
-    BackgroundJobQueue backgroundJobQueue,
-    NotificationQueue NotificationQueue,
     NotificationQueue notificationQueue,
     ILogger<JobProcessingController> logger) : ControllerBase
 {
@@ -58,7 +56,7 @@ public class JobProcessingController(
         try
         {
             userName = GetAuthenticatedUsername();
-            var (sId, channelReader) = NotificationQueue.Subscribe("JobNotification", userName);
+            var (sId, channelReader) = notificationQueue.Subscribe("JobNotification", userName);
             subscriptionId = sId;
 
             logger.LogInformation("Client {Username} connected with subscription {SubscriptionId}", userName, sId);
@@ -66,7 +64,7 @@ public class JobProcessingController(
             var notificationStream = Notifications(userName, channelReader, cancellationToken);
 
             var connectionMessageData = JsonSerializer.SerializeToElement(new JobResponse(string.Empty, "Connected", DateTime.UtcNow));
-            NotificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
+            notificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
 
             return Results.ServerSentEvents(notificationStream, eventType: "JobNotification");
         }
@@ -74,14 +72,14 @@ public class JobProcessingController(
         {
             logger.LogInformation(operationCanceledException, "Notification stream for user {Username} was cancelled", userName);
             var connectionMessageData = JsonSerializer.SerializeToElement(new JobResponse(string.Empty, "Disconnected", DateTime.UtcNow));
-            NotificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
+            notificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
             Unsubscribe(subscriptionId, userName);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error in notification stream for user {Username}", userName);
             var connectionMessageData = JsonSerializer.SerializeToElement(new JobResponse(string.Empty, "Disconnected", DateTime.UtcNow));
-            NotificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
+            notificationQueue.Publish(userName, new QueuedNotification("JobNotification", connectionMessageData));
             Unsubscribe(subscriptionId, userName);
         }
 
@@ -92,12 +90,12 @@ public class JobProcessingController(
     {
         if (subscriptionId != Guid.Empty && !string.IsNullOrEmpty(userName))
         {
-            NotificationQueue.Unsubscribe(subscriptionId);
+            notificationQueue.Unsubscribe(subscriptionId);
             logger.LogInformation("Client {Username} disconnected, unsubscribed {SubscriptionId}", userName, subscriptionId);
         }
     }
 
-    private async IAsyncEnumerable<JobResponse> Notifications(string userName, ChannelReader<QueuedNotification> channelReader, CancellationToken cancellationToken)
+    private async IAsyncEnumerable<JobResponse> Notifications(string userName, ChannelReader<QueuedNotification> channelReader, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (var notification in channelReader.ReadAllAsync(cancellationToken))
         {
@@ -150,7 +148,6 @@ public class JobProcessingController(
                     timestamp = parsedTimestamp;
                 }
             }
-
         }
 
         return new JobResponse(

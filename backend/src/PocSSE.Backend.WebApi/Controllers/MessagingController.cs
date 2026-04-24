@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PocSSE.Backend.WebApi.Infra.Notifications;
 using PocSSE.Backend.WebApi.Models.API.Responses;
@@ -59,7 +60,7 @@ namespace PocSSE.Backend.WebApi.Controllers
             try
             {
                 userName = GetAuthenticatedUsername();
-                var (sId, channelReader) = NotificationQueue.Subscribe("MessagingNotification", userName);
+                var (sId, channelReader) = notificationQueue.Subscribe("MessagingNotification", userName);
                 subscriptionId = sId;
 
                 logger.LogInformation("Client {Username} connected with subscription {SubscriptionId}", userName, sId);
@@ -67,7 +68,7 @@ namespace PocSSE.Backend.WebApi.Controllers
                 var notificationStream = Notifications(userName, channelReader, cancellationToken);
 
                 var connectionMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("Connected", string.Empty));
-                NotificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
+                notificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
 
                 return Results.ServerSentEvents(notificationStream, eventType: "MessagingNotification");
             }
@@ -75,14 +76,14 @@ namespace PocSSE.Backend.WebApi.Controllers
             {
                 logger.LogInformation(operationCanceledException, "Notification stream for user {Username} was cancelled", userName);
                 var connectionMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("Disconnected", string.Empty));
-                NotificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
+                notificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
                 Unsubscribe(subscriptionId, userName);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error in notification stream for user {Username}", userName);
                 var connectionMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("Disconnected", string.Empty));
-                NotificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
+                notificationQueue.Publish(userName, new QueuedNotification("MessagingNotification", connectionMessageData));
                 Unsubscribe(subscriptionId, userName);
             }
 
@@ -93,12 +94,12 @@ namespace PocSSE.Backend.WebApi.Controllers
         {
             if (subscriptionId != Guid.Empty && !string.IsNullOrEmpty(userName))
             {
-                NotificationQueue.Unsubscribe(subscriptionId);
+                notificationQueue.Unsubscribe(subscriptionId);
                 logger.LogInformation("Client {Username} disconnected, unsubscribed {SubscriptionId}", userName, subscriptionId);
             }
         }
 
-        private async IAsyncEnumerable<MessagingNotification> Notifications(string userName, ChannelReader<QueuedNotification> channelReader, CancellationToken cancellationToken)
+        private async IAsyncEnumerable<MessagingNotification> Notifications(string userName, ChannelReader<QueuedNotification> channelReader, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             await foreach (var notification in channelReader.ReadAllAsync(cancellationToken))
             {
