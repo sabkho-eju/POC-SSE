@@ -1,4 +1,5 @@
 import { authService } from './AuthenticationService';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 // Configuration de base
 // En dev, Vite proxifiera /api vers http://localhost:5236
@@ -123,61 +124,84 @@ export const jobApi = {
       return () => {};
     }
 
-    // EventSource ne supporte pas les headers personnalisés, on passe le token dans l'URL
-    const url = `${API_BASE_URL}/jobprocessing/job-notification-stream?access_token=${encodeURIComponent(token)}`;
-    const eventSource = new EventSource(url);
+    const url = `${API_BASE_URL}/jobprocessing/job-notification-stream`;
+    const abortController = new AbortController();
 
-    // Connexion ouverte
-    eventSource.onopen = () => {
-      console.log('SSE Connection opened');
-      handlers.onOpen?.();
-    };
-
-    // Écouter l'événement spécifique 'JobNotification' défini côté backend
-    eventSource.addEventListener('JobNotification', (event) => {
-      try {
-        const notification: JobResponse = JSON.parse(event.data);
-        console.log(`Job Notification ${event.lastEventId}:`, notification);
-        handlers.onMessage(notification);
-      } catch (error) {
-        const parseError = error instanceof Error 
+    // Utiliser fetch-event-source pour supporter les headers personnalisés
+    fetchEventSource(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'text/event-stream',
+      },
+      signal: abortController.signal,
+      
+      onopen: async (response) => {
+        if (response.ok) {
+          console.log('SSE Connection opened');
+          handlers.onOpen?.();
+        } else if (response.status === 401) {
+          authService.clearAuth();
+          handlers.onError?.(new Error('Non authentifié. Veuillez vous connecter.'));
+          throw new Error('Unauthorized');
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      },
+      
+      onmessage: (event) => {
+        // Gérer les événements spécifiques par type
+        if (event.event === 'JobNotification') {
+          try {
+            const notification: JobResponse = JSON.parse(event.data);
+            console.log(`Job Notification ${event.id}:`, notification);
+            handlers.onMessage(notification);
+          } catch (error) {
+            const parseError = error instanceof Error 
+              ? error 
+              : new Error('Erreur lors du parsing de la notification');
+            handlers.onError?.(parseError);
+          }
+        } else if (!event.event || event.event === 'message') {
+          // Messages génériques sans type d'événement
+          try {
+            const notification: JobResponse = JSON.parse(event.data);
+            console.log('Received job notification:', notification);
+            handlers.onMessage(notification);
+          } catch (error) {
+            const parseError = error instanceof Error 
+              ? error 
+              : new Error('Erreur lors du parsing de la notification');
+            handlers.onError?.(parseError);
+          }
+        }
+      },
+      
+      onclose: () => {
+        console.log('SSE Connection closed');
+        handlers.onClose?.();
+      },
+      
+      onerror: (error) => {
+        console.error('SSE Error:', error);
+        const normalizedError = error instanceof Error 
           ? error 
-          : new Error('Erreur lors du parsing de la notification');
-        handlers.onError?.(parseError);
+          : new Error('Erreur de connexion SSE');
+        handlers.onError?.(normalizedError);
+        // Lancer l'erreur pour arrêter les reconnexions automatiques si nécessaire
+        throw normalizedError;
+      },
+    }).catch((error) => {
+      // Gérer les erreurs qui ne sont pas des reconnexions
+      if (error.name !== 'AbortError') {
+        console.error('fetchEventSource error:', error);
       }
     });
 
-    // Gérer les messages génériques (si le backend n'utilise pas d'événement nommé)
-    eventSource.onmessage = (event) => {
-      try {
-        const notification: JobResponse = JSON.parse(event.data);
-        console.log('Received job notification:', notification);
-        handlers.onMessage(notification);
-      } catch (error) {
-        const parseError = error instanceof Error 
-          ? error 
-          : new Error('Erreur lors du parsing de la notification');
-        handlers.onError?.(parseError);
-      }
-    };
-
-    // Gérer les erreurs et reconnexions
-    eventSource.onerror = () => {
-      if (eventSource.readyState === EventSource.CONNECTING) {
-        console.log('SSE Reconnecting...');
-      } else if (eventSource.readyState === EventSource.CLOSED) {
-        console.log('SSE Connection closed');
-        handlers.onClose?.();
-      } else {
-        const error = new Error('Erreur de connexion SSE');
-        handlers.onError?.(error);
-      }
-    };
-
-    // Retourner une fonction de cleanup pour fermer la connexion
+    // Retourner une fonction de cleanup pour arrêter la connexion
     return () => {
       console.log('Closing SSE connection');
-      eventSource.close();
+      abortController.abort();
       handlers.onClose?.();
     };
   },  
