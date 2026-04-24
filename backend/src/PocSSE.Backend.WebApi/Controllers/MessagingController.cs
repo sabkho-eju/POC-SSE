@@ -10,7 +10,7 @@ namespace PocSSE.Backend.WebApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class MessagingController(NotificationQueue NotificationQueue,
+    public class MessagingController(NotificationQueue notificationQueue,
         ILogger<MessagingController> logger) : ControllerBase
     {
         [HttpPost("send-message-to-a-user")]
@@ -22,7 +22,7 @@ namespace PocSSE.Backend.WebApi.Controllers
                 username, recipientClientId);
 
             var sendMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("SendMessageToUser", message));
-            var count = NotificationQueue.Publish(recipientClientId, new QueuedNotification("MessagingNotification", sendMessageData));
+            var count = notificationQueue.Publish(recipientClientId, new QueuedNotification("MessagingNotification", sendMessageData));
 
             if (count > 0)
             {
@@ -40,7 +40,7 @@ namespace PocSSE.Backend.WebApi.Controllers
             var username = GetAuthenticatedUsername();
             logger.LogInformation("Broadcast message: {Message} from user: {Username}", message, username);
             var broadcastMessageData = JsonSerializer.SerializeToElement(new MessagingNotification("BroadcastMessage", message));
-            var count = NotificationQueue.Publish(null, new QueuedNotification("MessagingNotification", broadcastMessageData));
+            var count = notificationQueue.Publish(null, new QueuedNotification("MessagingNotification", broadcastMessageData));
 
             if (count > 0)
             {

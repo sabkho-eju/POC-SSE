@@ -26,7 +26,7 @@ export function useMessagingNotification() {
         isConnected.value = true;        
         },
       onMessage: (messagingNotification) => {
-        console.debug('Notification reçue:', messagingNotification);
+        //console.debug('Notification reçue:', messagingNotification);
         notifications.value.push({
           message: messagingNotification.message
         });

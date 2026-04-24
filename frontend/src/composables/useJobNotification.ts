@@ -28,7 +28,7 @@ export function useJobNotification() {
         isConnected.value = true;        
       },
       onMessage: (jobNotification) => {
-        console.debug('Notification reçue:', jobNotification);
+        //console.debug('Notification reçue:', jobNotification);
         notifications.value.push({
           jobId: jobNotification.jobId,
           status: jobNotification.status,

@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using PocSSE.Backend.WebApi.Infra.Jobs;
+using PocSSE.Backend.WebApi.Infra.Notifications;
 using PocSSE.Backend.WebApi.Models.API.Requests;
 using PocSSE.Backend.WebApi.Models.API.Responses;
 using PocSSE.Backend.WebApi.Models.Entities;
@@ -16,6 +16,7 @@ namespace PocSSE.Backend.WebApi.Controllers;
 public class JobProcessingController(
     BackgroundJobQueue backgroundJobQueue,
     NotificationQueue NotificationQueue,
+    NotificationQueue notificationQueue,
     ILogger<JobProcessingController> logger) : ControllerBase
 {
     [HttpPost("process")]
@@ -26,11 +27,12 @@ public class JobProcessingController(
 
         logger.LogInformation("Processing job: {JobId} for user: {Username}", request.JobId, username);
 
-        await backgroundJobQueue.QueueAsync(new QueuedJob(
-            JobId: request.JobId,
-            ClientId: username,
-            Description: request.JobData,
-            DurationSeconds: request.DurationSeconds));
+        notificationQueue.Publish(string.Empty, new QueuedNotification("JobProcessing",
+            Data: JsonSerializer.SerializeToElement(new JobProcessingDescriptor(
+                JobId: request.JobId,
+                ClientId: username,
+                Description: request.JobData,
+                DurationSeconds: request.DurationSeconds))));
 
         return Ok(new JobResponse(request.JobId, "JobQueued", DateTime.UtcNow));
     }
