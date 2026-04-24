@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PocSSE.Backend.WebApi.Infra.Jobs;
-using PocSSE.Backend.WebApi.Infra.Notifications;
 using PocSSE.Backend.WebApi.Models.API.Requests;
 using PocSSE.Backend.WebApi.Models.API.Responses;
 using PocSSE.Backend.WebApi.Models.Entities;
@@ -13,7 +12,6 @@ namespace PocSSE.Backend.WebApi.Controllers;
 [Route("api/[controller]")]
 public class JobProcessingController(
     BackgroundJobQueue backgroundJobQueue,
-    NotificationQueue NotificationQueue,
     ILogger<JobProcessingController> logger) : ControllerBase
 {
     [HttpPost("process")]

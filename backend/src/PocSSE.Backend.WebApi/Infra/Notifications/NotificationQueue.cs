@@ -5,85 +5,107 @@ namespace PocSSE.Backend.WebApi.Infra.Notifications
 {
     public class NotificationQueue(ILogger<NotificationQueue> logger)
     {
-        private readonly ConcurrentDictionary<string, ClientSubscription> _subscriptions = new();
+        private readonly ConcurrentDictionary<string, ConcurrentBag<EventSubscription>> _subscriptionsByEventType = new();
+        private readonly ConcurrentDictionary<Guid, EventSubscription> _subscriptionsById = new();
 
-        public (Guid subscriptionId, ChannelReader<QueuedNotification> reader) Subscribe(string clientId)
+        public (Guid subscriptionId, ChannelReader<QueuedNotification> reader) Subscribe(string eventType, string? clientId = null)
         {
-            // Vérifie si une souscription existe déjà
-            if (_subscriptions.TryGetValue(clientId, out var existingSubscription))
-            {
-                logger.LogWarning("Client {ClientId} attempted to subscribe but already has an active subscription {SubscriptionId}. Returning existing subscription.",
-                    clientId, existingSubscription.SubscriptionId);
-                return (existingSubscription.SubscriptionId, existingSubscription.Channel.Reader);
-            }
-
-            // Crée une nouvelle souscription
             var subscriptionId = Guid.NewGuid();
             var channel = Channel.CreateUnbounded<QueuedNotification>();
-            var newSubscription = new ClientSubscription(subscriptionId, channel);
+            var subscription = new EventSubscription(subscriptionId, eventType, clientId, channel);
 
-            // Ajoute la souscription (ne devrait jamais échouer vu le check au-dessus)
-            if (_subscriptions.TryAdd(clientId, newSubscription))
-            {
-                logger.LogInformation("Client {ClientId} subscribed with subscription {SubscriptionId}", clientId, subscriptionId);
-                return (subscriptionId, channel.Reader);
-            }
+            // Ajoute la souscription dans le dictionnaire par ID
+            _subscriptionsById.TryAdd(subscriptionId, subscription);
 
-            // Si TryAdd échoue (race condition), retourne l'existante
-            var actualSubscription = _subscriptions[clientId];
-            logger.LogWarning("Client {ClientId} subscription race condition detected. Returning existing subscription {SubscriptionId}",
-                clientId, actualSubscription.SubscriptionId);
-            return (actualSubscription.SubscriptionId, actualSubscription.Channel.Reader);
+            // Ajoute la souscription dans le bag par EventType
+            var subscriptions = _subscriptionsByEventType.GetOrAdd(eventType, _ => new ConcurrentBag<EventSubscription>());
+            subscriptions.Add(subscription);
+
+            var clientInfo = string.IsNullOrEmpty(clientId) ? "anonymous" : clientId;
+            logger.LogInformation("Subscription {SubscriptionId} created for EventType '{EventType}' (client: {ClientInfo})",
+                subscriptionId, eventType, clientInfo);
+
+            return (subscriptionId, channel.Reader);
         }
 
-        public void Unsubscribe(string clientId, Guid subscriptionId)
+        public void Unsubscribe(Guid subscriptionId)
         {
-            if (!_subscriptions.TryGetValue(clientId, out var subscription))
+            if (!_subscriptionsById.TryRemove(subscriptionId, out var subscription))
             {
-                logger.LogWarning("Attempted to unsubscribe client {ClientId} with subscription {SubscriptionId}, but client not found",
-                    clientId, subscriptionId);
+                logger.LogWarning("Attempted to unsubscribe {SubscriptionId}, but subscription not found", subscriptionId);
                 return;
             }
 
-            // Vérifie que c'est bien la bonne souscription avant de la supprimer
-            if (subscription.SubscriptionId == subscriptionId)
+            subscription.Channel.Writer.TryComplete();
+
+            // Note: On ne retire pas du ConcurrentBag car c'est difficile/coûteux
+            // On marque juste comme inactif et on nettoie lors de la publication
+            subscription.IsActive = false;
+
+            var clientInfo = string.IsNullOrEmpty(subscription.ClientId) ? "anonymous" : subscription.ClientId;
+            logger.LogInformation("Subscription {SubscriptionId} removed for EventType '{EventType}' (client: {ClientInfo})",
+                subscriptionId, subscription.EventType, clientInfo);
+        }
+
+        public int Publish(string? clientId, QueuedNotification notification)
+        {
+            if (!_subscriptionsByEventType.TryGetValue(notification.EventType, out var subscriptions))
             {
-                if (_subscriptions.TryRemove(clientId, out var removedSubscription))
+                logger.LogDebug("No subscriptions found for EventType '{EventType}'", notification.EventType);
+                return 0;
+            }
+
+            var successCount = 0;
+            var inactiveSubscriptions = new List<EventSubscription>();
+
+            // Filtrer par clientId si fourni
+            var targetSubscriptions = string.IsNullOrEmpty(clientId)
+                ? subscriptions
+                : subscriptions.Where(s => s.ClientId == clientId);
+
+            foreach (var subscription in targetSubscriptions)
+            {
+                if (!subscription.IsActive)
                 {
-                    removedSubscription.Channel.Writer.TryComplete();
-                    logger.LogInformation("Client {ClientId} unsubscribed {SubscriptionId}", clientId, subscriptionId);
+                    inactiveSubscriptions.Add(subscription);
+                    continue;
+                }
+
+                if (subscription.Channel.Writer.TryWrite(notification))
+                {
+                    successCount++;
+                    var clientInfo = string.IsNullOrEmpty(subscription.ClientId) ? "anonymous" : subscription.ClientId;
+                    logger.LogDebug("Published notification '{EventType}' to subscription {SubscriptionId} (client: {ClientInfo})",
+                        notification.EventType, subscription.SubscriptionId, clientInfo);
+                }
+                else
+                {
+                    logger.LogWarning("Failed to write notification '{EventType}' to subscription {SubscriptionId}",
+                        notification.EventType, subscription.SubscriptionId);
                 }
             }
-            else
+
+            // Nettoyage optionnel des souscriptions inactives détectées
+            if (inactiveSubscriptions.Count > 0)
             {
-                logger.LogWarning("Client {ClientId} attempted to unsubscribe {SubscriptionId}, but current subscription is {CurrentSubscriptionId}",
-                    clientId, subscriptionId, subscription.SubscriptionId);
+                logger.LogDebug("Detected {Count} inactive subscriptions for EventType '{EventType}' during publish",
+                    inactiveSubscriptions.Count, notification.EventType);
             }
+
+            logger.LogInformation("Published notification '{EventType}' to {SuccessCount} active subscriptions",
+                notification.EventType, successCount);
+
+            return successCount;
         }
 
-        public bool PublishToClient(string clientId, QueuedNotification notification)
+        private class EventSubscription(Guid subscriptionId, string eventType, string? clientId, Channel<QueuedNotification> channel)
         {
-            if (!_subscriptions.TryGetValue(clientId, out var subscription))
-            {
-                logger.LogDebug("No subscription found for client {ClientId}, notification '{EventName}' not sent",
-                    clientId, notification.EventName);
-                return false;
-            }
-
-            if (subscription.Channel.Writer.TryWrite(notification))
-            {
-                logger.LogInformation("Published notification '{EventName}' to client {ClientId} (subscription {SubscriptionId})",
-                    notification.EventName, clientId, subscription.SubscriptionId);
-                return true;
-            }
-            else
-            {
-                logger.LogWarning("Failed to write notification '{EventName}' to client {ClientId} (subscription {SubscriptionId})",
-                    notification.EventName, clientId, subscription.SubscriptionId);
-                return false;
-            }
+            public Guid SubscriptionId { get; } = subscriptionId;
+            public string EventType { get; } = eventType;
+            public string? ClientId { get; } = clientId;
+            public Channel<QueuedNotification> Channel { get; } = channel;
+            public bool IsActive { get; set; } = true;
         }
-
-        private record ClientSubscription(Guid SubscriptionId, Channel<QueuedNotification> Channel);
     }
 }
+

@@ -1,4 +1,4 @@
 ﻿namespace PocSSE.Backend.WebApi.Models.API.Responses
 {
-    public record MessagingNotification(string Message);
+    public record MessagingNotification(string MessageType, string Message);
 }
